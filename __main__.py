@@ -7,7 +7,7 @@ import torch
 from torch import nn
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from sklearn.metrics import recall_score, confusion_matrix
+from sklearn.metrics import recall_score, confusion_matrix, roc_auc_score
 from nn_models import *
 from dataloader_wav import WavDataset
 from config import OUTPUT_DIR
@@ -64,8 +64,8 @@ def init():
     feature = sys.argv[1]
     model_name = model_t.__name__
 
-    workspace_path = os.path.join(OUTPUT_DIR, 'mask_code')
-    namespace = feature + "_" + model_name  # namespace is the dir name under output/mask/
+    workspace_path = os.path.join(OUTPUT_DIR, 'orca-biclf')
+    namespace = feature + "_" + model_name  # namespace is the dir name under output/orca-biclf
     save_path = os.path.join(workspace_path, namespace, "models")
     log_path = os.path.join(workspace_path, namespace, "log")
 
@@ -79,7 +79,7 @@ def init():
         os.makedirs(log_path, exist_ok=True)
 
     # data
-    dataset_dir = '/mingback/wuhw/data/compare2020/Mask/index/'
+    dataset_dir = './index/'
     train_utt2data = [[line.split()[0], line.split()[1]] for line in open(dataset_dir + 'train_utt2wav')]
     label2int = dict([line.split() for line in open(dataset_dir + 'label2int')])
     dev_utt2data = [[line.split()[0], line.split()[1]] for line in open(dataset_dir + 'devel_utt2wav')]
@@ -91,20 +91,19 @@ def init():
     # net
     learning_rate = 0.1 # resnet
     # learning_rate = 0.2 # alexnet
-#     learning_rate = 0.01
     net = model_t(n_classes=2)
     net = nn.DataParallel(net)
     net = net.cuda()
     criterion = nn.CrossEntropyLoss()
-#     optimizer = optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9, nesterov=True)
-    optimizer = optim.Adam(net.parameters())
+    optimizer = optim.SGD(net.parameters(), lr=learning_rate, momentum=0.9, nesterov=True)
+#     optimizer = optim.Adam(net.parameters())
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, verbose=True, min_lr=1e-4)
 
     print("logs are stored at {}".format(log_path))
     print("models are stored at {}".format(save_path))
 
     configs = {
-        'n_epochs': 50,
+        'n_epochs': 30,
         'epoch': 0,  # current epochs
         'batch_size': 64,
         'learning_rate': learning_rate,
@@ -171,9 +170,9 @@ def train(configs):
     return losses.avg
 
 
-def save_model(configs):
-    torch.save(configs, os.path.join(configs['save_path'], "checkpoint_" + str(configs['epoch'])))
-
+def save_model(model_dict):
+#     torch.save(configs, os.path.join(configs['save_path'], "checkpoint_" + str(configs['epoch'])))
+    torch.save(model_dict, os.path.join(configs['save_path'], "checkpoint_" + str(configs['epoch'])))
 
 def main(configs):
     while configs['epoch'] < configs['n_epochs'] + 1:
@@ -209,8 +208,8 @@ def validate(configs):
     y_true = np.concatenate(y_true)
     y_pred = np.concatenate(y_pred)
     classes = [0, 1]
-    uar = recall_score(y_true, y_pred, labels=classes, average='macro')
-    print('UAR on Devel {0:.1f}'.format(uar * 100))
+    roc_auc = roc_auc_score(y_true, y_pred, labels=classes)
+    print('AUC on Devel {0:.1f}'.format(roc_auc * 100))
     print('Confusion matrix (Devel):')
     print(classes)
     print(confusion_matrix(y_true, y_pred, labels=classes))
