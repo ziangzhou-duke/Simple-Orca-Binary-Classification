@@ -7,7 +7,7 @@ import torch
 from torch import nn
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from sklearn.metrics import recall_score, confusion_matrix, roc_auc_score
+from sklearn.metrics import confusion_matrix, roc_auc_score
 from nn_models import *
 from dataloader_wav import WavDataset
 from config import OUTPUT_DIR
